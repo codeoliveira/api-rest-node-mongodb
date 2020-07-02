@@ -61,7 +61,26 @@ var Router = /** @class */ (function (_super) {
                     res.json(fullData);
                 }
                 else {
-                    res.send(404);
+                    var fullData = {
+                        data: {
+                            items: data,
+                            total: data.length,
+                            filtered: data.length
+                        },
+                        search: {
+                            key: '',
+                            value: ''
+                        },
+                        pagination: {
+                            start: 0,
+                            limit: 100
+                        },
+                        return: true,
+                        status: 200,
+                        message: 'Process done'
+                    };
+                    res.json(fullData);
+                    // res.send(404);
                 }
                 return next();
             };
