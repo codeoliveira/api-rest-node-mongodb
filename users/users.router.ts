@@ -1,19 +1,18 @@
-import { Router } from '../common/router';
+import { ModelRouter } from '../common/model-router';
 import * as restify from 'restify';
 import { User } from './users.model';
-import { NotFoundError } from 'restify-errors';
 import { DefaultReturn } from '../common/defaultReturn';
 
-class UsersRouter extends Router {
+class UsersRouter extends ModelRouter<User> {
 	constructor() {
-		super();
+		super(User);
 		this.on('beforeRenderSingle', document => {
 			document.password = undefined;
 			return document;
 		});
 
 		this.on('beforeRenderList', data => {
-			data.map(document => {
+			data.map((document: any) => {
 				document.password = undefined;
 				return document;
 			});
@@ -25,77 +24,17 @@ class UsersRouter extends Router {
 	applyRoutes(app: restify.Server) {
 		const DFReturn = new DefaultReturn();
 
-		app.get('/users', (req, res, next) => {
-			User.find().then(this.renderList(req, res, next)).catch(next);
-		});
+		app.get('/users', this.findAll);
 
-		app.get('/users/:id', (req, res, next) => {
-			User.findById(req.params.id)
-				.then(this.render(req, res, next))
-				// .catch(err => {
-				// 	this.error(res, next, false, 404, 'User not found');
-				// });
-				.catch(next);
-		});
+		app.get('/users/:id', [this.validateId, this.findById]);
 
-		app.post('/users', (req, res, next) => {
-			const user: User = new User(req.body);
-			user
-				.save()
-				.then(this.render(req, res, next))
-				// .catch(err => {
-				// 	this.error(res, next, false, 404, 'User not created');
-				// });
-				.catch(next);
-		});
+		app.post('/users', this.save);
 
-		app.put('/users/:id', (req, res, next) => {
-			// const user: User = new User(req.body);
-			const options = { overwrite: true };
-			User.update({ _id: req.params.id }, req.body, options)
-				.exec()
-				.then((result): any => {
-					if (result.n) {
-						return User.findById(req.params.id);
-					} else {
-						throw new NotFoundError('Documento não encontrado');
-					}
-				})
-				.then(this.render(req, res, next))
-				// .catch(err => {
-				// 	this.error(res, next, false, 404, 'User not updated');
-				// });
-				.catch(next);
-		});
+		app.put('/users/:id', [this.validateId, this.replace]);
 
-		app.patch('/user/:id', (req, res, next) => {
-			const options = { new: true };
+		app.patch('/user/:id', [this.validateId, this.update]);
 
-			User.findByIdAndUpdate(req.params.id, req.body, options).then(user => {
-				if (user) {
-					const dfR = DFReturn.build([user], req);
-					res.json(dfR);
-					// return next();
-				} else {
-					throw new NotFoundError('Documento não encontrado');
-				}
-				return next();
-			});
-		});
-
-		app.del('/users/:id', (req, res, next) => {
-			User.findByIdAndRemove({ _id: req.params.id })
-				.then(user => {
-					if (user) {
-						const dfR = DFReturn.build([user], req);
-						res.json(dfR);
-						return next();
-					} else {
-						throw new NotFoundError('Documento não encontrado');
-					}
-				})
-				.catch(next);
-		});
+		app.del('/users/:id', [this.validateId, this.delete]);
 	}
 }
 

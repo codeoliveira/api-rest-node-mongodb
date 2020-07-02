@@ -12,5 +12,8 @@ exports.environment = {
         DB: process.env.DB_DB || "api-rest-mongodb",
         USER: process.env.DB_USER || "admin",
         PASSWORD: process.env.DB_PASSWORD || "dev102030"
+    },
+    security: {
+        saltRounds: process.env.saltRounds || 10
     }
 };
