@@ -20,7 +20,7 @@
 	},
 	"homepage": "https://github.com/codeoliveira/api-rest-node-mongodb#readme",
 	"dependencies": {
-		"mongoose": "4.13.9",
+		"mongoose": "5.7.5",
 		"node-typescript": "^0.1.3",
 		"nodemon": "1.14.7",
 		"restify": "6.3.4",
