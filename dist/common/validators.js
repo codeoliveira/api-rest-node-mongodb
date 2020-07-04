@@ -1,13 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateCPF = function (cpf) {
-    var sum, rest;
+exports.validateCPF = (cpf) => {
+    let sum, rest;
     if (cpf == undefined || cpf.trim().length === 0 || cpf === '00000000000') {
         return false;
     }
     cpf = cpf.replace('.', '').replace('.', '').replace('-', '');
     sum = 0;
-    for (var i = 1; i <= 9; i++) {
+    for (let i = 1; i <= 9; i++) {
         sum += parseInt(cpf.substring(i - 1, i)) * (11 - i);
     }
     rest = (sum * 10) % 11;

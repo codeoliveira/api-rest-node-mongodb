@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleError = function (req, res, err, done) {
-    err.toJSON = function () {
+exports.handleError = (req, res, err, done) => {
+    err.toJSON = () => {
         return {
             message: err.message
         };
@@ -14,13 +14,14 @@ exports.handleError = function (req, res, err, done) {
             break;
         case 'ValidationError':
             err.statusCode = 400;
-            var messages_1 = [];
-            for (var name_1 in err.errors) {
-                messages_1.push({ message: err.errors[name_1].message });
+            const messages = [];
+            for (let name in err.errors) {
+                messages.push({ message: err.errors[name].message });
             }
-            err.toJSON = function () { return ({
-                errors: messages_1
-            }); };
+            err.toJSON = () => ({
+                message: 'Validation error while processing your request',
+                errors: messages
+            });
             break;
     }
     done();

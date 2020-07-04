@@ -5,6 +5,10 @@ import { NotFoundError } from 'restify-errors';
 export abstract class Router extends EventEmitter {
 	abstract applyRoutes(application: restify.Server): any;
 
+	envelope(document: any): any {
+		return document;
+	}
+
 	render = (
 		req: restify.Request,
 		res: restify.Response,
@@ -15,7 +19,7 @@ export abstract class Router extends EventEmitter {
 				this.emit('beforeRenderSingle', data);
 				const fullData = {
 					data: {
-						item: data
+						item: this.envelope(data)
 					},
 					return: true,
 					status: 200,
@@ -25,7 +29,7 @@ export abstract class Router extends EventEmitter {
 			} else {
 				throw new NotFoundError('Documento não encontrado');
 			}
-			return next();
+			return next(false);
 		};
 	};
 
@@ -36,7 +40,13 @@ export abstract class Router extends EventEmitter {
 	) => {
 		return (data: any[]) => {
 			if (data.length > 0) {
-				this.emit('beforeRenderList', data);
+				data.forEach((document, index, array) => {
+					this.emit('beforeRenderSingle', document);
+					array[index] = this.envelope(document);
+				});
+
+				// this.emit('beforeRenderList', data);
+
 				const fullData = {
 					data: {
 						items: data,
@@ -44,12 +54,12 @@ export abstract class Router extends EventEmitter {
 						filtered: data.length
 					},
 					search: {
-						key: '',
-						value: ''
+						key: req.query.search.key,
+						value: req.query.search.value
 					},
 					pagination: {
-						start: 0,
-						limit: 100
+						start: req.query.pagination.start,
+						limit: req.query.pagination.limit
 					},
 					return: true,
 					status: 200,
@@ -78,7 +88,7 @@ export abstract class Router extends EventEmitter {
 				res.json(fullData);
 				// res.send(404);
 			}
-			return next();
+			return next(false);
 		};
 	};
 

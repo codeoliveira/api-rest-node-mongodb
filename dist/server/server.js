@@ -1,19 +1,23 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var restify = require("restify");
-var environment_1 = require("./../common/environment");
-var mongoose = require("mongoose");
-var merge_patch_parser_1 = require("./merge-patch.parser");
-var error_handler_1 = require("./../server/error.handler");
-var Server = /** @class */ (function () {
-    function Server() {
-        this.getConfig = function () {
+const fs = require("fs");
+const restify = require("restify");
+const environment_1 = require("./../common/environment");
+const mongoose = require("mongoose");
+const merge_patch_parser_1 = require("./merge-patch.parser");
+const error_handler_1 = require("./../server/error.handler");
+const token_parser_1 = require("../security/token.parser");
+const logger_1 = require("./../common/logger");
+class Server {
+    constructor() {
+        this.getConfig = () => {
             return environment_1.environment.server;
         };
-        this.initDB = function () {
-            var _a = environment_1.environment.db, PROTOCOL = _a.PROTOCOL, HOST = _a.HOST, PORT = _a.PORT, DB = _a.DB, USER = _a.USER, PASSWORD = _a.PASSWORD;
+        this.initDB = () => {
+            const { PROTOCOL, HOST, PORT, DB, USER, PASSWORD } = environment_1.environment.db;
             mongoose.Promise = global.Promise;
-            var connection = mongoose.connect("" + PROTOCOL + USER + ":" + PASSWORD + "@" + HOST + ":" + PORT + "/" + DB + "\n\t\t\t?authSource=admin", {
+            const connection = mongoose.connect(`${PROTOCOL}${USER}:${PASSWORD}@${HOST}:${PORT}/${DB}
+			?authSource=admin`, {
                 useMongoClient: true
             });
             return connection;
@@ -28,31 +32,39 @@ var Server = /** @class */ (function () {
             // });
         };
     }
-    Server.prototype.initRoutes = function (routers) {
-        var _this = this;
-        var _a = this.getConfig(), HOST = _a.HOST, PORT = _a.PORT;
-        return new Promise(function (resolve, reject) {
+    initRoutes(routers) {
+        const { HOST, PORT } = this.getConfig();
+        return new Promise((resolve, reject) => {
             try {
-                _this.application = restify.createServer({
+                const options = {
                     name: 'rest-mongodb-api',
-                    version: '1.0.0'
-                });
-                _this.application.use(restify.plugins.queryParser());
-                _this.application.use(restify.plugins.bodyParser());
-                _this.application.use(merge_patch_parser_1.mergePatchBodyParser);
-                _this.application.use(function crossOrigin(req, res, next) {
+                    version: '1.0.0',
+                    log: logger_1.logger
+                };
+                if (environment_1.environment.security.enableHTTPS) {
+                    options.certificate = fs.readFileSync(environment_1.environment.security.certificate);
+                    options.key = fs.readFileSync(environment_1.environment.security.key);
+                }
+                this.application = restify.createServer(options);
+                this.application.pre(restify.plugins.requestLogger({
+                    log: logger_1.logger
+                }));
+                this.application.use(restify.plugins.queryParser());
+                this.application.use(restify.plugins.bodyParser());
+                this.application.use(merge_patch_parser_1.mergePatchBodyParser);
+                this.application.use(token_parser_1.tokenParser);
+                this.application.use(function crossOrigin(req, res, next) {
                     res.header('Access-Control-Allow-Origin', '*');
                     res.header('Access-Control-Allow-Headers', 'X-Requested-With');
                     return next();
                 });
                 // this.application.use(restify.plugins.fullResponse());
                 // routes
-                for (var _i = 0, routers_1 = routers; _i < routers_1.length; _i++) {
-                    var route = routers_1[_i];
-                    route.applyRoutes(_this.application);
+                for (const route of routers) {
+                    route.applyRoutes(this.application);
                 }
-                _this.application.listen(PORT, HOST, function () {
-                    resolve(_this.application);
+                this.application.listen(PORT, HOST, () => {
+                    resolve(this.application);
                     // console.log(
                     // 	`\x1b[33m[api]`,
                     // 	`\x1b[0m>\x1b[36m`,
@@ -60,23 +72,23 @@ var Server = /** @class */ (function () {
                     // 	`\x1b[0m`
                     // );
                 });
-                _this.application.on('restifyError', error_handler_1.handleError);
+                this.application.on('restifyError', error_handler_1.handleError);
             }
             catch (error) {
-                console.log("\u001B[33m[api]\u001B[31m[ERROR]", "\u001B[0m>\u001B[36m", "" + error, "\u001B[0m");
+                console.log(`\x1b[33m[api]\x1b[31m[ERROR]`, `\x1b[0m>\x1b[36m`, `${error}`, `\x1b[0m`);
                 process.exit(1);
             }
         });
-    };
-    Server.prototype.bootstrap = function (routers) {
-        var _this = this;
-        if (routers === void 0) { routers = []; }
-        return this.initDB().then(function () {
-            return _this.initRoutes(routers).then(function () { return _this; });
+    }
+    bootstrap(routers = []) {
+        return this.initDB().then(() => {
+            return this.initRoutes(routers).then(() => this);
         });
-    };
-    return Server;
-}());
+    }
+    shutdown() {
+        mongoose.disconnect().then(() => this.application.close());
+    }
+}
 exports.Server = Server;
 // Reset = "\x1b[0m"
 // Bright = "\x1b[1m"

@@ -1,9 +1,13 @@
+import * as fs from 'fs';
 import * as restify from 'restify';
 import { environment } from './../common/environment';
 import { Router } from './../common/router';
 import * as mongoose from 'mongoose';
 import { mergePatchBodyParser } from './merge-patch.parser';
 import { handleError } from './../server/error.handler';
+import { tokenParser } from '../security/token.parser';
+
+import { logger } from './../common/logger';
 
 export class Server {
 	application: restify.Server;
@@ -43,14 +47,31 @@ export class Server {
 
 		return new Promise((resolve, reject) => {
 			try {
-				this.application = restify.createServer({
+				const options: restify.ServerOptions = {
 					name: 'rest-mongodb-api',
-					version: '1.0.0'
-				});
+					version: '1.0.0',
+					log: logger
+				};
+
+				if (environment.security.enableHTTPS) {
+					options.certificate = fs.readFileSync(
+						environment.security.certificate
+					);
+					options.key = fs.readFileSync(environment.security.key);
+				}
+
+				this.application = restify.createServer(options);
+
+				this.application.pre(
+					restify.plugins.requestLogger({
+						log: logger
+					})
+				);
 
 				this.application.use(restify.plugins.queryParser());
 				this.application.use(restify.plugins.bodyParser());
 				this.application.use(mergePatchBodyParser);
+				this.application.use(tokenParser);
 				this.application.use(function crossOrigin(req, res, next) {
 					res.header('Access-Control-Allow-Origin', '*');
 					res.header('Access-Control-Allow-Headers', 'X-Requested-With');
@@ -65,15 +86,18 @@ export class Server {
 
 				this.application.listen(PORT, HOST, () => {
 					resolve(this.application);
-					// console.log(
-					// 	`\x1b[33m[api]`,
-					// 	`\x1b[0m>\x1b[36m`,
-					// 	`Server is running on ${HOST}:${PORT}`,
-					// 	`\x1b[0m`
-					// );
 				});
 
 				this.application.on('restifyError', handleError);
+
+				// CUIDADO AO USAR POIS ESTE REGISTRA O HEADER DO REQUEST ONDE FICA O TOKEN DO USUARIO
+				// this.application.on(
+				// 	'after',
+				// 	restify.plugins.auditLogger({
+				// 		log: logger,
+				// 		event: 'after'
+				// 	})
+				// );
 			} catch (error) {
 				console.log(
 					`\x1b[33m[api]\x1b[31m[ERROR]`,
@@ -90,6 +114,10 @@ export class Server {
 		return this.initDB().then(() => {
 			return this.initRoutes(routers).then(() => this);
 		});
+	}
+
+	shutdown() {
+		mongoose.disconnect().then(() => this.application.close());
 	}
 }
 

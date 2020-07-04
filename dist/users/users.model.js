@@ -1,10 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var mongoose = require("mongoose");
-var validators_1 = require("../common/validators");
-var bcrypt = require("bcrypt");
-var environment_1 = require("./../common/environment");
-var userSchema = new mongoose.Schema({
+const mongoose = require("mongoose");
+const validators_1 = require("../common/validators");
+const bcrypt = require("bcrypt");
+const environment_1 = require("./../common/environment");
+const userSchema = new mongoose.Schema({
     name: { type: String, required: true, minlength: 3, maxlength: 50 },
     email: {
         type: String,
@@ -27,19 +27,32 @@ var userSchema = new mongoose.Schema({
             validator: validators_1.validateCPF,
             message: '{PATH}: Invalid CPF ({VALUE})'
         }
+    },
+    profiles: {
+        type: [String],
+        required: false
     }
 });
-var hashPassword = function (obj, next) {
+userSchema.statics.findByEmail = function (email, projection) {
+    return this.findOne({ email: email }, projection);
+};
+userSchema.methods.matches = function (password) {
+    return bcrypt.compareSync(password, this.password);
+};
+userSchema.methods.hasAny = function (...profiles) {
+    return profiles.some(profile => this.profiles.indexOf(profile) !== -1);
+};
+const hashPassword = (obj, next) => {
     bcrypt
         .hash(obj.password, environment_1.environment.security.saltRounds)
-        .then(function (hash) {
+        .then(hash => {
         obj.password = hash;
         next();
     })
         .catch(next);
 };
-var saveMiddleware = function (next) {
-    var user = this;
+const saveMiddleware = function (next) {
+    const user = this;
     if (!user.isModified('password')) {
         next();
     }
@@ -47,7 +60,7 @@ var saveMiddleware = function (next) {
         hashPassword(user, next);
     }
 };
-var updateMiddleware = function (next) {
+const updateMiddleware = function (next) {
     if (!this.getUpdate().password) {
         next();
     }

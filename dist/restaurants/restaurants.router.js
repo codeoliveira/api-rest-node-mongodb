@@ -1,25 +1,16 @@
 "use strict";
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-var model_router_1 = require("../common/model-router");
-var restaurants_model_1 = require("./restaurants.model");
-var restify_errors_1 = require("restify-errors");
-var RestaurantsRouter = /** @class */ (function (_super) {
-    __extends(RestaurantsRouter, _super);
-    function RestaurantsRouter() {
-        var _this = _super.call(this, restaurants_model_1.Restaurant) || this;
-        _this.findMenu = function (req, res, next) {
+const model_router_1 = require("../common/model-router");
+const restaurants_model_1 = require("./restaurants.model");
+const restify_errors_1 = require("restify-errors");
+const environment_1 = require("./../common/environment");
+const authz_handler_1 = require("../security/authz.handler");
+class RestaurantsRouter extends model_router_1.ModelRouter {
+    constructor() {
+        super(restaurants_model_1.Restaurant);
+        this.findMenu = (req, res, next) => {
             restaurants_model_1.Restaurant.findById(req.params.id, '+menu')
-                .then(function (rest) {
+                .then(rest => {
                 if (!rest) {
                     throw new restify_errors_1.NotFoundError('Restaurant not found');
                 }
@@ -30,9 +21,9 @@ var RestaurantsRouter = /** @class */ (function (_super) {
             })
                 .catch(next);
         };
-        _this.replaceMenu = function (req, res, next) {
+        this.replaceMenu = (req, res, next) => {
             restaurants_model_1.Restaurant.findById(req.params.id)
-                .then(function (rest) {
+                .then(rest => {
                 if (!rest) {
                     throw new restify_errors_1.NotFoundError('Restaurant not found');
                 }
@@ -41,35 +32,54 @@ var RestaurantsRouter = /** @class */ (function (_super) {
                     return rest.save();
                 }
             })
-                .then(function (rest) {
+                .then(rest => {
                 res.json(rest.menu);
                 return next();
             })
                 .catch(next);
         };
-        _this.on('beforeRenderSingle', function (document) {
-            document.password = undefined;
-            return document;
-        });
-        _this.on('beforeRenderList', function (data) {
-            data.map(function (document) {
-                document.password = undefined;
-                return document;
-            });
-            return data;
-        });
-        return _this;
+        // this.on('beforeRenderSingle', document => {
+        // 	document.password = undefined;
+        // 	return document;
+        // });
+        // this.on('beforeRenderList', data => {
+        // 	data.map((document: any) => {
+        // 		document.password = undefined;
+        // 		return document;
+        // 	});
+        // 	return data;
+        // });
     }
-    RestaurantsRouter.prototype.applyRoutes = function (app) {
-        app.get('/restaurants', this.findAll);
-        app.get('/restaurants/:id', [this.validateId, this.findById]);
-        app.post('/restaurants', this.save);
-        app.put('/restaurants/:id', [this.validateId, this.replace]);
-        app.patch('/restaurants/:id', [this.validateId, this.update]);
-        app.del('/restaurants/:id', [this.validateId, this.delete]);
-        app.get('/restaurants/:id/menu', [this.validateId, this.findMenu]);
-        app.put('/restaurants/:id/menu', [this.validateId, this.replaceMenu]);
-    };
-    return RestaurantsRouter;
-}(model_router_1.ModelRouter));
+    envelope(document) {
+        let resource = super.envelope(document);
+        resource._links.menu = `${environment_1.environment.server.PROTOCOL}://${environment_1.environment.server.HOST}:${environment_1.environment.server.PORT}${this.basePath}/${resource._id}/menu`;
+        return resource;
+    }
+    applyRoutes(app) {
+        app.get(`${this.basePath}`, this.findAll);
+        app.get(`${this.basePath}/:id`, [this.validateId, this.findById]);
+        app.post(`${this.basePath}`, [authz_handler_1.authorize('admin'), this.save]);
+        app.put(`${this.basePath}/:id`, [
+            authz_handler_1.authorize('admin'),
+            this.validateId,
+            this.replace
+        ]);
+        app.patch(`${this.basePath}/:id`, [
+            authz_handler_1.authorize('admin'),
+            this.validateId,
+            this.update
+        ]);
+        app.del(`${this.basePath}/:id`, [
+            authz_handler_1.authorize('admin'),
+            this.validateId,
+            this.delete
+        ]);
+        app.get(`${this.basePath}/:id/menu`, [this.validateId, this.findMenu]);
+        app.put(`${this.basePath}/:id/menu`, [
+            authz_handler_1.authorize('admin'),
+            this.validateId,
+            this.replaceMenu
+        ]);
+    }
+}
 exports.restaurantsRouter = new RestaurantsRouter();

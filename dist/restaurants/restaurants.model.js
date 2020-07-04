@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var mongoose = require("mongoose");
-var menuSchema = new mongoose.Schema({
+const mongoose = require("mongoose");
+const menuSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true
@@ -11,7 +11,7 @@ var menuSchema = new mongoose.Schema({
         required: true
     }
 });
-var restSchema = new mongoose.Schema({
+const restSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true

@@ -1,24 +1,14 @@
 "use strict";
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-var router_1 = require("./router");
-var mongoose = require("mongoose");
-var restify_errors_1 = require("restify-errors");
-var ModelRouter = /** @class */ (function (_super) {
-    __extends(ModelRouter, _super);
-    function ModelRouter(model) {
-        var _this = _super.call(this) || this;
-        _this.model = model;
-        _this.validateId = function (req, res, next) {
+const router_1 = require("./router");
+const mongoose = require("mongoose");
+const restify_errors_1 = require("restify-errors");
+const environment_1 = require("./../common/environment");
+class ModelRouter extends router_1.Router {
+    constructor(model) {
+        super();
+        this.model = model;
+        this.validateId = (req, res, next) => {
             if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
                 next(new restify_errors_1.NotFoundError('Document not found'));
             }
@@ -26,56 +16,79 @@ var ModelRouter = /** @class */ (function (_super) {
                 next();
             }
         };
-        _this.findAll = function (req, res, next) {
-            _this.model.find().then(_this.renderList(req, res, next)).catch(next);
-        };
-        _this.findById = function (req, res, next) {
-            _this.model
-                .findById(req.params.id)
-                .then(_this.render(req, res, next))
+        this.findAll = (req, res, next) => {
+            // PAGINATION
+            req.query.pagination = req.query.pagination ? req.query.pagination : {};
+            const pag = req.query.pagination;
+            pag.start = pag.start ? parseInt(pag.start) : this.pagination.start;
+            pag.limit = pag.limit ? parseInt(pag.limit) : this.pagination.limit;
+            req.query.pagination = pag;
+            // SEARCH
+            req.query.search = req.query.search ? req.query.search : {};
+            const search = req.query.search;
+            search.key = search.start ? search.start : this.search.key;
+            search.value = search.limit ? search.limit : this.search.value;
+            req.query.search = search;
+            this.model
+                .find()
+                .skip(req.query.pagination.start * req.query.pagination.limit)
+                .limit(req.query.pagination.limit)
+                .then(this.renderList(req, res, next))
                 .catch(next);
         };
-        _this.save = function (req, res, next) {
-            var document = new _this.model(req.body);
-            document.save().then(_this.render(req, res, next)).catch(next);
+        this.findById = (req, res, next) => {
+            this.model
+                .findById(req.params.id)
+                .then(this.render(req, res, next))
+                .catch(next);
         };
-        _this.replace = function (req, res, next) {
-            var options = {
+        this.save = (req, res, next) => {
+            const document = new this.model(req.body);
+            document.save().then(this.render(req, res, next)).catch(next);
+        };
+        this.replace = (req, res, next) => {
+            const options = {
                 runValidators: true,
                 overwrite: true
             };
-            _this.model
+            this.model
                 .update({ _id: req.params.id }, req.body, options)
                 .exec()
-                .then(function (result) {
+                .then((result) => {
                 if (result.n) {
-                    return _this.model.findById(req.params.id);
+                    return this.model.findById(req.params.id);
                 }
                 else {
                     throw new restify_errors_1.NotFoundError('Documento não encontrado');
                 }
             })
-                .then(_this.render(req, res, next))
+                .then(this.render(req, res, next))
                 .catch(next);
         };
-        _this.update = function (req, res, next) {
-            var options = {
+        this.update = (req, res, next) => {
+            const options = {
                 runValidators: true,
                 new: true
             };
-            _this.model
+            this.model
                 .findByIdAndUpdate(req.params.id, req.body, options)
-                .then(_this.render(req, res, next))
+                .then(this.render(req, res, next))
                 .catch(next);
         };
-        _this.delete = function (req, res, next) {
-            _this.model
+        this.delete = (req, res, next) => {
+            this.model
                 .findByIdAndRemove({ _id: req.params.id })
-                .then(_this.render(req, res, next))
+                .then(this.render(req, res, next))
                 .catch(next);
         };
-        return _this;
+        this.basePath = `/${model.collection.name}`;
+        this.pagination = environment_1.environment.pagination;
+        this.search = environment_1.environment.search;
     }
-    return ModelRouter;
-}(router_1.Router));
+    envelope(document) {
+        let resource = Object.assign({ _links: {} }, document.toJSON());
+        resource._links.self = `${environment_1.environment.server.PROTOCOL}://${environment_1.environment.server.HOST}:${environment_1.environment.server.PORT}${this.basePath}/${resource._id}`;
+        return resource;
+    }
+}
 exports.ModelRouter = ModelRouter;

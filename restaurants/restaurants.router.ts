@@ -2,23 +2,31 @@ import { ModelRouter } from '../common/model-router';
 import * as restify from 'restify';
 import { Restaurant } from './restaurants.model';
 import { NotFoundError } from 'restify-errors';
+import { environment } from './../common/environment';
+import { authorize } from '../security/authz.handler';
 
 class RestaurantsRouter extends ModelRouter<Restaurant> {
 	constructor() {
 		super(Restaurant);
-		this.on('beforeRenderSingle', document => {
-			document.password = undefined;
-			return document;
-		});
+		// this.on('beforeRenderSingle', document => {
+		// 	document.password = undefined;
+		// 	return document;
+		// });
 
-		this.on('beforeRenderList', data => {
-			data.map((document: any) => {
-				document.password = undefined;
-				return document;
-			});
+		// this.on('beforeRenderList', data => {
+		// 	data.map((document: any) => {
+		// 		document.password = undefined;
+		// 		return document;
+		// 	});
 
-			return data;
-		});
+		// 	return data;
+		// });
+	}
+
+	envelope(document: Restaurant) {
+		let resource = super.envelope(document);
+		resource._links.menu = `${environment.server.PROTOCOL}://${environment.server.HOST}:${environment.server.PORT}${this.basePath}/${resource._id}/menu`;
+		return resource;
 	}
 
 	findMenu = (
@@ -60,15 +68,31 @@ class RestaurantsRouter extends ModelRouter<Restaurant> {
 	};
 
 	applyRoutes(app: restify.Server) {
-		app.get('/restaurants', this.findAll);
-		app.get('/restaurants/:id', [this.validateId, this.findById]);
-		app.post('/restaurants', this.save);
-		app.put('/restaurants/:id', [this.validateId, this.replace]);
-		app.patch('/restaurants/:id', [this.validateId, this.update]);
-		app.del('/restaurants/:id', [this.validateId, this.delete]);
+		app.get(`${this.basePath}`, this.findAll);
+		app.get(`${this.basePath}/:id`, [this.validateId, this.findById]);
+		app.post(`${this.basePath}`, [authorize('admin'), this.save]);
+		app.put(`${this.basePath}/:id`, [
+			authorize('admin'),
+			this.validateId,
+			this.replace
+		]);
+		app.patch(`${this.basePath}/:id`, [
+			authorize('admin'),
+			this.validateId,
+			this.update
+		]);
+		app.del(`${this.basePath}/:id`, [
+			authorize('admin'),
+			this.validateId,
+			this.delete
+		]);
 
-		app.get('/restaurants/:id/menu', [this.validateId, this.findMenu]);
-		app.put('/restaurants/:id/menu', [this.validateId, this.replaceMenu]);
+		app.get(`${this.basePath}/:id/menu`, [this.validateId, this.findMenu]);
+		app.put(`${this.basePath}/:id/menu`, [
+			authorize('admin'),
+			this.validateId,
+			this.replaceMenu
+		]);
 	}
 }
 

@@ -2,10 +2,30 @@ import * as restify from 'restify';
 import { Router } from './router';
 import * as mongoose from 'mongoose';
 import { NotFoundError } from 'restify-errors';
+import { environment } from './../common/environment';
 
 export abstract class ModelRouter<D extends mongoose.Document> extends Router {
+	basePath: string;
+	pagination: {
+		start: Number;
+		limit: Number;
+	};
+	search: {
+		key: String;
+		value: String;
+	};
+
 	constructor(protected model: mongoose.Model<D>) {
 		super();
+		this.basePath = `/${model.collection.name}`;
+		this.pagination = environment.pagination;
+		this.search = environment.search;
+	}
+
+	envelope(document: any): any {
+		let resource = Object.assign({ _links: {} }, document.toJSON());
+		resource._links.self = `${environment.server.PROTOCOL}://${environment.server.HOST}:${environment.server.PORT}${this.basePath}/${resource._id}`;
+		return resource;
 	}
 
 	validateId = (
@@ -25,7 +45,26 @@ export abstract class ModelRouter<D extends mongoose.Document> extends Router {
 		res: restify.Response,
 		next: restify.Next
 	) => {
-		this.model.find().then(this.renderList(req, res, next)).catch(next);
+		// PAGINATION
+		req.query.pagination = req.query.pagination ? req.query.pagination : {};
+		const pag = req.query.pagination;
+		pag.start = pag.start ? parseInt(pag.start) : this.pagination.start;
+		pag.limit = pag.limit ? parseInt(pag.limit) : this.pagination.limit;
+		req.query.pagination = pag;
+
+		// SEARCH
+		req.query.search = req.query.search ? req.query.search : {};
+		const search = req.query.search;
+		search.key = search.start ? search.start : this.search.key;
+		search.value = search.limit ? search.limit : this.search.value;
+		req.query.search = search;
+
+		this.model
+			.find()
+			.skip(req.query.pagination.start * req.query.pagination.limit)
+			.limit(req.query.pagination.limit)
+			.then(this.renderList(req, res, next))
+			.catch(next);
 	};
 
 	findById = (
