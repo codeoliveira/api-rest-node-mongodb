@@ -38,7 +38,7 @@
 	},
 	"homepage": "https://github.com/codeoliveira/api-rest-node-mongodb#readme",
 	"dependencies": {
-		"bcrypt": "1.0.3",
+		"bcrypt": "5.0.0",
 		"jsonwebtoken": "8.1.1",
 		"mongoose": "4.13.9",
 		"node-typescript": "^0.1.3",
